@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "165689634931",
+    "project_id": "mobiguard-sales-12345",
+    "storage_bucket": "mobiguard-sales-12345.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:165689634931:android:114ad7928a0c28c49c7a06",
+        "android_client_info": {
+          "package_name": "com.example.mobiguard_sales"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBq51nvd7uU6EQD0qPksDFKLD4uJFb0UlU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
