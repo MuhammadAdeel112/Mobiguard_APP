@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../contracts_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_ui.dart';
 
 class ContractListScreen extends ConsumerStatefulWidget {
   const ContractListScreen({super.key});
@@ -38,7 +39,7 @@ class _ContractListScreenState extends ConsumerState<ContractListScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(contractsProvider);
     final theme = Theme.of(context);
-    final formatter = NumberFormat.currency(symbol: 'PKR ', decimalDigits: 0);
+    final formatter = NumberFormat.currency(symbol: 'Rs. ', decimalDigits: 0);
     final dateFormatter = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
@@ -49,25 +50,9 @@ class _ContractListScreenState extends ConsumerState<ContractListScreen> {
         children: [
           // Error banner
           if (state.error != null)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: Colors.redAccent.withValues(alpha: 0.15),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.redAccent),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      state.error!,
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.redAccent, size: 20),
-                    onPressed: () => ref.read(contractsProvider.notifier).fetchContracts(isRefresh: true),
-                  )
-                ],
-              ),
+            ErrorBanner(
+              message: state.error!,
+              onRetry: () => ref.read(contractsProvider.notifier).fetchContracts(isRefresh: true),
             ),
 
           Expanded(
@@ -75,9 +60,20 @@ class _ContractListScreenState extends ConsumerState<ContractListScreen> {
               onRefresh: () async {
                 await ref.read(contractsProvider.notifier).fetchContracts(isRefresh: true);
               },
-              child: state.contracts.isEmpty && !state.isLoading
-                  ? const Center(child: Text('No contracts available', style: TextStyle(color: Colors.grey, fontSize: 16)))
-                  : ListView.builder(
+              child: state.isLoading && state.contracts.isEmpty
+                  ? const ListSkeleton()
+                  : state.contracts.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            EmptyState(
+                              icon: Icons.description_outlined,
+                              title: 'No contracts available',
+                              subtitle: 'Active contracts assigned to your branch will appear here.',
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(12),
@@ -119,24 +115,7 @@ class _ContractListScreenState extends ConsumerState<ContractListScreen> {
                                           ),
                                         ),
                                       ),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            contract.status.toLowerCase() == 'active' ? Icons.circle : Icons.circle_outlined,
-                                            size: 10,
-                                            color: contract.status.toLowerCase() == 'active' ? Colors.green : Colors.orange,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            contract.status.toUpperCase(),
-                                            style: TextStyle(
-                                              color: contract.status.toLowerCase() == 'active' ? Colors.green : Colors.orange,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                      StatusChip.fromStatus(contract.status),
                                     ],
                                   ),
                                   const SizedBox(height: 12),

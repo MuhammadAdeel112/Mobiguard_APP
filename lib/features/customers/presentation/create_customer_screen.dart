@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../customers_providers.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -48,7 +49,7 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.of(context).pop();
+        context.pop();
       }
     } catch (e) {
       if (mounted) {

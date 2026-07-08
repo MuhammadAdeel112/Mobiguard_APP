@@ -165,24 +165,8 @@ class NotificationsNotifier extends StateNotifier<NotificationListState> {
       final apiClient = _ref.read(apiClientProvider);
       await apiClient.patch('${ApiPaths.notifications}/$id/read');
     } catch (_) {
-      // Revert if needed, but for now just ignore
+      await fetchNotifications(isRefresh: true);
     }
-  }
-
-  void addMockNotification(String title, String body) {
-    final newNotif = NotificationModel(
-      id: DateTime.now().millisecondsSinceEpoch,
-      title: title,
-      body: body,
-      read: false,
-      type: 'info',
-      severity: 'info',
-      createdAt: DateTime.now(),
-    );
-    state = state.copyWith(
-      notifications: [newNotif, ...state.notifications],
-      unreadCount: state.unreadCount + 1,
-    );
   }
 }
 

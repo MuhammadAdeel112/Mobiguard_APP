@@ -33,6 +33,10 @@ class AppTheme {
         surface: lightBg,
       ),
       scaffoldBackgroundColor: lightBg,
+      bottomAppBarTheme: const BottomAppBarThemeData(
+        color: primaryColor,
+        elevation: 8,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
@@ -118,6 +122,10 @@ class AppTheme {
         surface: darkBg,
       ),
       scaffoldBackgroundColor: darkBg,
+      bottomAppBarTheme: const BottomAppBarThemeData(
+        color: Color(0xFF1E293B),
+        elevation: 8,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF1E293B),
         foregroundColor: Colors.white,

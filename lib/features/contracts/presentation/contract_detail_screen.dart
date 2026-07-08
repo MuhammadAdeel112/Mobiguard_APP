@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../auth/auth_providers.dart';
+import '../../../core/constants/constants.dart';
 import '../contracts_providers.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -15,8 +18,10 @@ class ContractDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailState = ref.watch(contractDetailProvider(contractId));
+    final user = ref.watch(authProvider).user;
+    final canEnroll = user?.hasPermission(AppPermissions.enrollmentsCreate) ?? false;
     final theme = Theme.of(context);
-    final currencyFormatter = NumberFormat.currency(symbol: 'PKR ', decimalDigits: 0);
+    final currencyFormatter = NumberFormat.currency(symbol: 'Rs. ', decimalDigits: 0);
     final dateFormatter = DateFormat('MMM dd, yyyy');
     final monthFormatter = DateFormat('MMMM yyyy');
 
@@ -216,10 +221,22 @@ class ContractDetailScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  if (contract.device == null && canEnroll)
+                    ElevatedButton.icon(
+                      onPressed: () => context.push('/enrollment?contractId=${contract.id}'),
+                      icon: const Icon(Icons.app_registration),
+                      label: const Text('Start Enrollment'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  if (contract.device == null && canEnroll) const SizedBox(height: 12),
 
                   OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.pop(),
                     child: const Text('Back to List'),
                   ),
                   const SizedBox(height: 16),

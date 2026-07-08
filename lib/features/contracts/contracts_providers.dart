@@ -141,6 +141,7 @@ class ContractModel {
 
 class ContractListState {
   final List<ContractModel> contracts;
+  final int total;
   final int page;
   final bool hasReachedMax;
   final bool isLoading;
@@ -148,6 +149,7 @@ class ContractListState {
 
   ContractListState({
     required this.contracts,
+    required this.total,
     required this.page,
     required this.hasReachedMax,
     required this.isLoading,
@@ -156,6 +158,7 @@ class ContractListState {
 
   factory ContractListState.initial() => ContractListState(
         contracts: [],
+        total: 0,
         page: 1,
         hasReachedMax: false,
         isLoading: false,
@@ -163,6 +166,7 @@ class ContractListState {
 
   ContractListState copyWith({
     List<ContractModel>? contracts,
+    int? total,
     int? page,
     bool? hasReachedMax,
     bool? isLoading,
@@ -170,12 +174,24 @@ class ContractListState {
   }) {
     return ContractListState(
       contracts: contracts ?? this.contracts,
+      total: total ?? this.total,
       page: page ?? this.page,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
   }
+}
+
+int _extractListTotal(Map<String, dynamic> responseData, int fallback) {
+  final meta = responseData['meta'];
+  if (meta is Map && meta['total'] != null) {
+    return meta['total'] as int;
+  }
+  if (responseData['total'] != null) {
+    return responseData['total'] as int;
+  }
+  return fallback;
 }
 
 class ContractsNotifier extends StateNotifier<ContractListState> {
@@ -203,15 +219,19 @@ class ContractsNotifier extends StateNotifier<ContractListState> {
         },
       );
 
-      final data = response.data['data'] as List;
-      final meta = response.data['meta'] as Map<String, dynamic>?;
+      final responseData = response.data as Map<String, dynamic>;
+      final data = responseData['data'] as List;
+      final meta = responseData['meta'] as Map<String, dynamic>?;
       final currentLastPage = meta != null ? (meta['last_page'] as int? ?? 1) : 1;
 
       final fetchedContracts = data.map((json) => ContractModel.fromJson(json)).toList();
+      final updatedContracts =
+          isRefresh ? fetchedContracts : [...state.contracts, ...fetchedContracts];
 
       state = state.copyWith(
         isLoading: false,
-        contracts: isRefresh ? fetchedContracts : [...state.contracts, ...fetchedContracts],
+        contracts: updatedContracts,
+        total: _extractListTotal(responseData, updatedContracts.length),
         page: targetPage + 1,
         hasReachedMax: targetPage >= currentLastPage,
       );

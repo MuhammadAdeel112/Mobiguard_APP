@@ -6,10 +6,10 @@ import '../../core/constants/constants.dart';
 
 class TransactionModel {
   final String id;
-  final String type; // 'Credit' or 'Debit'
+  final String type;
   final String source;
   final double amount;
-  final String status; // 'Completed' or 'Pending'
+  final String status;
   final DateTime date;
 
   TransactionModel({
@@ -85,17 +85,21 @@ class WalletNotifier extends StateNotifier<AsyncValue<WalletState>> {
     try {
       final apiClient = _ref.read(apiClientProvider);
       final response = await apiClient.get(ApiPaths.wallet);
-      final data = response.data;
-      
-      final txs = (data['transactions'] as List)
-          .map((json) => TransactionModel.fromJson(json))
-          .toList();
-      
+      final data = response.data as Map<String, dynamic>;
+
+      final txsRaw = data['transactions'];
+      final txs = txsRaw is List
+          ? txsRaw
+              .whereType<Map<String, dynamic>>()
+              .map((json) => TransactionModel.fromJson(json))
+              .toList()
+          : <TransactionModel>[];
+
       state = AsyncValue.data(WalletState(
-        balance: double.parse(data['balance'].toString()),
-        currency: 'PKR', // Setting PKR as default for Pakistan
+        balance: double.parse((data['balance'] ?? 0).toString()),
+        currency: data['currency']?.toString() ?? 'PKR',
         walletEnabled: data['wallet_enabled'] as bool? ?? false,
-        walletStatus: data['wallet_status'] as String? ?? 'inactive',
+        walletStatus: data['wallet_status']?.toString() ?? 'inactive',
         transactions: txs,
       ));
     } catch (e, stack) {
@@ -105,67 +109,32 @@ class WalletNotifier extends StateNotifier<AsyncValue<WalletState>> {
 
   Future<void> requestTopup(double amount, String imagePath) async {
     final apiClient = _ref.read(apiClientProvider);
-    final filename = imagePath.split('/').last;
+    final filename = imagePath.split(Platform.pathSeparator).last;
 
-    try {
-      final file = File(imagePath);
-      if (!await file.exists()) {
-        throw Exception('Screenshot file does not exist');
-      }
-
-      final formData = FormData.fromMap({
-        'amount': amount,
-        'screenshot': await MultipartFile.fromFile(
-          imagePath,
-          filename: filename,
-        ),
-      });
-
-      final response = await apiClient.post(
-        ApiPaths.walletTopup,
-        data: formData,
-      );
-
-      final responseData = response.data;
-      if (responseData['status'] == 'success') {
-        final rawTx = responseData['request'];
-        final newTx = TransactionModel(
-          id: rawTx['id']?.toString() ?? 'TRX-TOP-${DateTime.now().millisecond}',
-          type: 'Credit',
-          source: 'Top-up Request (Pending Approval)',
-          amount: amount,
-          status: 'Pending',
-          date: DateTime.parse(rawTx['created_at'] ?? DateTime.now().toIso8601String()),
-        );
-
-        state.whenData((current) {
-          state = AsyncValue.data(current.copyWith(
-            transactions: [newTx, ...current.transactions],
-          ));
-        });
-      }
-    } catch (e) {
-      rethrow;
+    final file = File(imagePath);
+    if (!await file.exists()) {
+      throw Exception('Screenshot file does not exist');
     }
-  }
 
-  // Deduct balance locally when enrollment is successful
-  void deductBalance(double amount, String source) {
-    state.whenData((current) {
-      final newTx = TransactionModel(
-        id: 'TXN-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        type: 'Debit',
-        source: source,
-        amount: amount,
-        status: 'Completed',
-        date: DateTime.now(),
-      );
-
-      state = AsyncValue.data(current.copyWith(
-        balance: current.balance - amount,
-        transactions: [newTx, ...current.transactions],
-      ));
+    final formData = FormData.fromMap({
+      'amount': amount,
+      'screenshot': await MultipartFile.fromFile(
+        imagePath,
+        filename: filename,
+      ),
     });
+
+    final response = await apiClient.post(
+      ApiPaths.walletTopup,
+      data: formData,
+    );
+
+    final responseData = response.data as Map<String, dynamic>;
+    if (responseData['status'] == 'success') {
+      await fetchWallet();
+    } else {
+      throw Exception(responseData['message']?.toString() ?? 'Top-up request failed');
+    }
   }
 }
 

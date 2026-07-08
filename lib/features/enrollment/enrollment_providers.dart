@@ -2,19 +2,29 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import '../../core/config/app_config.dart';
 import '../../core/di/global_providers.dart';
 import '../../core/constants/constants.dart';
 import '../../core/error/exceptions.dart';
 import '../wallet/wallet_providers.dart';
 import '../notifications/notifications_providers.dart';
 
+int extractListTotal(Map<String, dynamic> responseData, int fallback) {
+  final meta = responseData['meta'];
+  if (meta is Map && meta['total'] != null) {
+    return meta['total'] as int;
+  }
+  if (responseData['total'] != null) {
+    return responseData['total'] as int;
+  }
+  return fallback;
+}
+
 // Response from POST /enrollment-requests
 class EnrollmentModel {
   final int enrollmentRequestId;
   final String token;
   final DateTime expiresAt;
-  final Map<String, dynamic> qrPayload; // full JSON object for QR encoding
+  final Map<String, dynamic> qrPayload;
 
   EnrollmentModel({
     required this.enrollmentRequestId,
@@ -23,7 +33,6 @@ class EnrollmentModel {
     required this.qrPayload,
   });
 
-  // The QR code must encode the entire qr_payload as a JSON string
   String get qrPayloadString => jsonEncode(qrPayload);
 
   factory EnrollmentModel.fromJson(Map<String, dynamic> json) {
@@ -86,7 +95,17 @@ final enrollmentProvider = StateNotifierProvider<EnrollmentNotifier, AsyncValue<
   return EnrollmentNotifier(ref);
 });
 
-// Enrollment Polling Notifier (StateNotifier Family)
+/// Total enrollment count from backend (GET /enrollment-requests meta.total).
+final enrollmentCountProvider = FutureProvider<int>((ref) async {
+  final apiClient = ref.read(apiClientProvider);
+  final response = await apiClient.get(
+    ApiPaths.enrollmentRequests,
+    queryParameters: {'page': 1, 'per_page': 1},
+  );
+  final responseData = response.data as Map<String, dynamic>;
+  return extractListTotal(responseData, 0);
+});
+
 class EnrollmentStatusNotifier extends StateNotifier<AsyncValue<String>> {
   final String enrollmentId;
   final Ref ref;
@@ -102,37 +121,28 @@ class EnrollmentStatusNotifier extends StateNotifier<AsyncValue<String>> {
   void _startPolling() {
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       try {
-        final dio = ref.read(dioProvider);
-        final response = await dio.get(
-          '${AppConfig.baseUrl}${ApiPaths.enrollmentRequests}/$enrollmentId/status',
+        final apiClient = ref.read(apiClientProvider);
+        final response = await apiClient.get(
+          '${ApiPaths.enrollmentRequests}/$enrollmentId/status',
         );
-        
-        final newStatus = response.data['status'] as String;
-        
+
+        final newStatus = response.data['status']?.toString() ?? 'Pending';
+
         if (state.value != newStatus) {
           state = AsyncValue.data(newStatus);
         }
 
-        if (newStatus == 'Approved' || newStatus == 'Rejected') {
+        final normalized = newStatus.toLowerCase();
+        if (normalized == 'approved' || normalized == 'rejected') {
           _timer?.cancel();
-
-          if (newStatus == 'Approved') {
-            // Add notification alert
-            ref.read(notificationsProvider.notifier).addMockNotification(
-              'Enrollment Approved 🎉',
-              'Enrollment $enrollmentId has been successfully verified. Device registered.',
-            );
-            // Deduct $49.99 Standard Protection price
-            ref.read(walletProvider.notifier).deductBalance(49.99, 'Enrollment: $enrollmentId');
-          } else {
-            ref.read(notificationsProvider.notifier).addMockNotification(
-              'Enrollment Rejected ❌',
-              'Enrollment $enrollmentId verification failed. Device rejected.',
-            );
-          }
+          await Future.wait([
+            ref.read(walletProvider.notifier).fetchWallet(),
+            ref.read(notificationsProvider.notifier).fetchNotifications(isRefresh: true),
+          ]);
+          ref.invalidate(enrollmentCountProvider);
         }
-      } catch (e) {
-        // Silently log or retry on next tick
+      } catch (_) {
+        // Retry on next poll tick
       }
     });
   }

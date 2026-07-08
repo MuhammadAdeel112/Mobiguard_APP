@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/customers/customers_providers.dart';
 import '../../features/customers/presentation/customer_list_screen.dart';
 import '../../features/customers/presentation/create_customer_screen.dart';
+import '../../features/customers/presentation/customer_detail_screen.dart';
 import '../../features/contracts/presentation/contract_list_screen.dart';
 import '../../features/contracts/presentation/contract_detail_screen.dart';
 import '../../features/enrollment/presentation/enrollment_screen.dart';
@@ -95,6 +97,15 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'create',
                 builder: (context, state) => const CreateCustomerScreen(),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (context, state) {
+                  final idStr = state.pathParameters['id'] ?? '';
+                  final id = int.tryParse(idStr) ?? 0;
+                  final customer = state.extra as CustomerModel?;
+                  return CustomerDetailScreen(customerId: id, customer: customer);
+                },
               ),
             ],
           ),

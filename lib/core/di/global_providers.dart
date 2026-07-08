@@ -8,7 +8,13 @@ import '../api/interceptors.dart';
 // Secure Storage Provider
 final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
   return const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
   );
 });
 
@@ -23,7 +29,6 @@ final dioProvider = Provider<Dio>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);
   
   dio.interceptors.add(AuthInterceptor(secureStorage: secureStorage));
-  dio.interceptors.add(MockInterceptor());
   dio.interceptors.add(LogInterceptor(
     requestHeader: true,
     requestBody: true,

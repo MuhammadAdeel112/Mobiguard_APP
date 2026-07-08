@@ -2,7 +2,15 @@ class StorageKeys {
   static const String token = 'auth_token';
   static const String user = 'auth_user';
   static const String environment = 'app_environment';
-  static const String mockMode = 'mock_mode_enabled';
+}
+
+class AppPermissions {
+  static const customersView = 'customers.view';
+  static const customersCreate = 'customers.create';
+  static const contractsView = 'contracts.view';
+  static const enrollmentsCreate = 'enrollments.create';
+  static const walletView = 'wallet.view';
+  static const walletTopupCreate = 'wallet_topups.create';
 }
 
 class ApiPaths {

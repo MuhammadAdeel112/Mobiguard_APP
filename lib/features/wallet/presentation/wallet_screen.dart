@@ -1,10 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
+import '../../auth/auth_providers.dart';
+import '../../../core/constants/constants.dart';
+import '../../../core/helpers.dart';
 import '../wallet_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_ui.dart';
+import '../../../shared/widgets/app_scaffold.dart';
 
 class WalletScreen extends ConsumerStatefulWidget {
   const WalletScreen({super.key});
@@ -14,9 +19,20 @@ class WalletScreen extends ConsumerStatefulWidget {
 }
 
 class _WalletScreenState extends ConsumerState<WalletScreen> {
-  final formatter = NumberFormat.currency(symbol: 'Rs. ', decimalDigits: 2);
+  void _showPermissionDenied() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You do not have permission to submit top-up requests'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
-  void _showTopupBottomSheet(BuildContext context) {
+  void _showTopupBottomSheet(BuildContext context, bool canTopup) {
+    if (!canTopup) {
+      _showPermissionDenied();
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -28,173 +44,195 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   @override
   Widget build(BuildContext context) {
     final walletState = ref.watch(walletProvider);
+    final user = ref.watch(authProvider).user;
+    final canTopup = user?.hasPermission(AppPermissions.walletTopupCreate) ?? false;
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Wallet Ledger'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => ref.read(walletProvider.notifier).fetchWallet(),
-        child: walletState.when(
-          data: (wallet) {
-            return CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                // Top Balance Display Card
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Card(
-                      elevation: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(24.0),
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.accentGradient,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'AVAILABLE BALANCE',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              formatter.format(wallet.balance),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            ElevatedButton.icon(
-                              onPressed: () => _showTopupBottomSheet(context),
-                              icon: const Icon(Icons.add_photo_alternate_outlined),
-                              label: const Text('Submit Top-up Request'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: AppTheme.secondaryColor,
-                                minimumSize: const Size(double.infinity, 48),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Transactions Header
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-                    child: Text(
-                      'Transaction History',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Transactions list
-                if (wallet.transactions.isEmpty)
-                  const SliverToBoxAdapter(
+      backgroundColor: AppTheme.primaryColor,
+      appBar: ReferenceAppBar.preferred(context, title: 'My Wallet Ledger'),
+      body: ReferenceBodyClip(
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(walletProvider.notifier).fetchWallet(),
+          child: walletState.when(
+            data: (wallet) {
+              return CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Center(child: Text('No transactions recorded yet')),
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final tx = wallet.transactions[index];
-                          final isCredit = tx.type == 'Credit';
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            elevation: 0.5,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: isCredit ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
-                                child: Icon(
-                                  isCredit ? Icons.arrow_downward : Icons.arrow_upward,
-                                  color: isCredit ? Colors.green : Colors.red,
-                                  size: 18,
+                      padding: const EdgeInsets.all(16.0),
+                      child: Card(
+                        elevation: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(24.0),
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.accentGradient,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'AVAILABLE BALANCE',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
                                 ),
                               ),
-                              title: Text(
-                                tx.source,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              const SizedBox(height: 8),
+                              Text(
+                                Helpers.formatCurrency(wallet.balance),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              subtitle: Text(
-                                DateFormat('MMM dd, yyyy • hh:mm a').format(tx.date),
-                                style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${isCredit ? "+" : "-"}${formatter.format(tx.amount)}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isCredit ? Colors.green : Colors.red,
-                                      fontSize: 14,
-                                    ),
+                              const SizedBox(height: 20),
+                              ElevatedButton.icon(
+                                onPressed: () => _showTopupBottomSheet(context, canTopup),
+                                icon: const Icon(Icons.add_photo_alternate_outlined),
+                                label: const Text('Submit Top-up Request'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: AppTheme.secondaryColor,
+                                  minimumSize: const Size(double.infinity, 48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: tx.status == 'Pending' 
-                                          ? Colors.amber.withValues(alpha: 0.15) 
-                                          : (tx.status == 'Completed' ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15)),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      tx.status,
-                                      style: TextStyle(
-                                        color: tx.status == 'Pending' 
-                                            ? Colors.amber.shade800 
-                                            : (tx.status == 'Completed' ? Colors.green.shade800 : Colors.redAccent),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                        childCount: wallet.transactions.length,
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 32),
-                ),
-              ],
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(child: Text('Error loading wallet: $err')),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                      child: Text(
+                        'Transaction History',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  if (wallet.transactions.isEmpty)
+                    SliverToBoxAdapter(
+                      child: EmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'No transactions yet',
+                        subtitle: 'Top-up requests and enrollment debits will show here.',
+                        actionLabel: canTopup ? 'Submit Top-up' : null,
+                        onAction: canTopup ? () => _showTopupBottomSheet(context, canTopup) : null,
+                      ),
+                    )
+                  else
+                    ..._buildGroupedTransactions(wallet.transactions),
+                  SliverPadding(
+                    padding: EdgeInsets.only(bottom: AppScaffold.fabOverlapClearance),
+                  ),
+                ],
+              );
+            },
+            loading: () => const ListSkeleton(itemCount: 4),
+            error: (err, _) => EmptyState(
+              icon: Icons.error_outline,
+              title: 'Could not load wallet',
+              subtitle: err.toString(),
+              actionLabel: 'Retry',
+              onAction: () => ref.read(walletProvider.notifier).fetchWallet(),
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildGroupedTransactions(List<TransactionModel> transactions) {
+    final groups = <String, List<TransactionModel>>{};
+    for (final tx in transactions) {
+      final label = Helpers.groupDateLabel(tx.date);
+      groups.putIfAbsent(label, () => []).add(tx);
+    }
+
+    final widgets = <Widget>[];
+    for (final entry in groups.entries) {
+      widgets.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, AppSpacing.sm, 20, AppSpacing.sm),
+            child: Text(
+              entry.key,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        ),
+      );
+      widgets.add(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final tx = entry.value[index];
+                final isCredit = tx.type == 'Credit';
+                return Card(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radius),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: isCredit
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.red.withValues(alpha: 0.1),
+                      child: Icon(
+                        isCredit ? Icons.south_west : Icons.north_east,
+                        color: isCredit ? Colors.green : Colors.red,
+                        size: 18,
+                      ),
+                    ),
+                    title: Text(tx.source, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text(
+                      Helpers.formatDateTime(tx.date),
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${isCredit ? "+" : "-"}${Helpers.formatCurrency(tx.amount)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isCredit ? Colors.green : Colors.red,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        StatusChip.fromStatus(tx.status),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              childCount: entry.value.length,
+            ),
+          ),
+        ),
+      );
+    }
+    return widgets;
   }
 }
 
@@ -211,6 +249,13 @@ class _TopupRequestSheetState extends ConsumerState<TopupRequestSheet> {
   final _amountController = TextEditingController();
   File? _selectedImage;
   bool _isSubmitting = false;
+
+  static const _presets = [500.0, 1000.0, 2000.0, 5000.0];
+
+  void _selectPreset(double amount) {
+    _amountController.text = amount.toStringAsFixed(0);
+    setState(() {});
+  }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -255,7 +300,7 @@ class _TopupRequestSheetState extends ConsumerState<TopupRequestSheet> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.of(context).pop();
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -311,7 +356,7 @@ class _TopupRequestSheetState extends ConsumerState<TopupRequestSheet> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.pop(),
                   )
                 ],
               ),
@@ -320,9 +365,18 @@ class _TopupRequestSheetState extends ConsumerState<TopupRequestSheet> {
                 'Submit bank transfer or deposit receipts for manual audit approval. Once confirmed, funds will appear in your ledger.',
                 style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
               ),
-              const SizedBox(height: 20),
-
-              // Amount Input
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: _presets.map((amount) {
+                  return ActionChip(
+                    label: Text('Rs. ${amount.toStringAsFixed(0)}'),
+                    onPressed: () => _selectPreset(amount),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),

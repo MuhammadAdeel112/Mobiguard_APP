@@ -75,11 +75,8 @@ class FirebaseService {
         print('FCM Foreground message received: ${message.messageId}');
       }
       
-      final title = message.notification?.title ?? 'MobiGuard Alert';
-      final body = message.notification?.body ?? 'New update received';
-      
-      // Add notification to Riverpod State so the UI refreshes instantly
-      _ref.read(notificationsProvider.notifier).addMockNotification(title, body);
+      // Refresh notifications from backend when a push arrives
+      _ref.read(notificationsProvider.notifier).fetchNotifications(isRefresh: true);
     });
 
     // 4. Terminated state click handler (App was closed completely)

@@ -25,4 +25,13 @@ class Helpers {
     if (imei.trim().length != 15) return false;
     return double.tryParse(imei.trim()) != null;
   }
+
+  static String groupDateLabel(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    if (day == today) return 'TODAY';
+    if (day == today.subtract(const Duration(days: 1))) return 'YESTERDAY';
+    return DateFormat('MMMM d, yyyy').format(date);
+  }
 }

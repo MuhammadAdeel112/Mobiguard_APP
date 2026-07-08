@@ -51,6 +51,7 @@ class CustomerModel {
 
 class CustomerListState {
   final List<CustomerModel> customers;
+  final int total;
   final int page;
   final bool hasReachedMax;
   final String searchQuery;
@@ -59,6 +60,7 @@ class CustomerListState {
 
   CustomerListState({
     required this.customers,
+    required this.total,
     required this.page,
     required this.hasReachedMax,
     required this.searchQuery,
@@ -68,6 +70,7 @@ class CustomerListState {
 
   factory CustomerListState.initial() => CustomerListState(
         customers: [],
+        total: 0,
         page: 1,
         hasReachedMax: false,
         searchQuery: '',
@@ -76,6 +79,7 @@ class CustomerListState {
 
   CustomerListState copyWith({
     List<CustomerModel>? customers,
+    int? total,
     int? page,
     bool? hasReachedMax,
     String? searchQuery,
@@ -84,6 +88,7 @@ class CustomerListState {
   }) {
     return CustomerListState(
       customers: customers ?? this.customers,
+      total: total ?? this.total,
       page: page ?? this.page,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       searchQuery: searchQuery ?? this.searchQuery,
@@ -91,6 +96,17 @@ class CustomerListState {
       error: error,
     );
   }
+}
+
+int _extractListTotal(Map<String, dynamic> responseData, int fallback) {
+  final meta = responseData['meta'];
+  if (meta is Map && meta['total'] != null) {
+    return meta['total'] as int;
+  }
+  if (responseData['total'] != null) {
+    return responseData['total'] as int;
+  }
+  return fallback;
 }
 
 class CustomerListNotifier extends StateNotifier<CustomerListState> {
@@ -121,15 +137,19 @@ class CustomerListNotifier extends StateNotifier<CustomerListState> {
         },
       );
 
-      final data = response.data['data'] as List;
-      final meta = response.data['meta'] as Map<String, dynamic>?;
+      final responseData = response.data as Map<String, dynamic>;
+      final data = responseData['data'] as List;
+      final meta = responseData['meta'] as Map<String, dynamic>?;
       final currentLastPage = meta != null ? (meta['last_page'] as int? ?? 1) : 1;
 
       final fetchedCustomers = data.map((json) => CustomerModel.fromJson(json)).toList();
+      final updatedCustomers =
+          isRefresh ? fetchedCustomers : [...state.customers, ...fetchedCustomers];
 
       state = state.copyWith(
         isLoading: false,
-        customers: isRefresh ? fetchedCustomers : [...state.customers, ...fetchedCustomers],
+        customers: updatedCustomers,
+        total: _extractListTotal(responseData, updatedCustomers.length),
         page: targetPage + 1,
         hasReachedMax: targetPage >= currentLastPage,
       );
@@ -179,6 +199,7 @@ class CustomerListNotifier extends StateNotifier<CustomerListState> {
       // Prepend to current list
       state = state.copyWith(
         customers: [customer, ...state.customers],
+        total: state.total + 1,
       );
       return customer;
     } on Failure catch (e) {
